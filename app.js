@@ -20,11 +20,6 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
     resave: false,
     saveUninitialized: true,
-    cookie: {
-        httpOnly: true,
-        sameSite: 'none',
-        secure: process.env.NODE_ENV === 'production'
-    }
 }));
 
 // Routes Imports
