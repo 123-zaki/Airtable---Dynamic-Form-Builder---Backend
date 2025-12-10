@@ -4,7 +4,7 @@ import { app } from "./app.js";
 
 dotenv.config();
 
-const port = process.env.PORT;
+const port = process.env.PORT || 4000;
 
 const mongoDB_URI = process.env.MONGODB_URI;
 
