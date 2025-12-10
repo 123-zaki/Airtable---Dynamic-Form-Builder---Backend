@@ -1,69 +1,73 @@
-export const airtableMe = async (req, res) => {
-  const airtableAccessToken = req.cookies["airtableAccessToken"];
-  const airtableRefreshToken = req.cookies["airtableRefreshToken"];
+import User from "../models/User.model.js";
 
-  if (!airtableAccessToken) {
-    return res.status(401).json({
-      message: "Unauthorized - Not Logged In",
-    });
-  }
-
+export const requireAirtableUser = async (req, res, next) => {
   try {
-    const response = await fetch("https://api.airtable.com/v0/meta/whoami", {
+    // 1. Get token from cookie (if present)
+    const cookieToken = req.cookies?.airtableAccessToken;
+
+    // 2. Or from Authorization header: "Bearer <token>"
+    const authHeader = req.headers?.authorization;
+    const headerToken =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : null;
+
+    // 3. Prefer cookie, fallback to header
+    const accessToken = cookieToken || headerToken;
+
+    if (!accessToken) {
+      return res.status(401).json({ message: "Not logged in" });
+    }
+
+    // 4. Call Airtable whoami
+    const whoamiRes = await fetch("https://api.airtable.com/v0/meta/whoami", {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${airtableAccessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: "application/json",
       },
     });
 
-    const data = await response.json();
-    console.log("Data (Who-Am-I): ", data);
+    const whoamiData = await whoamiRes.json();
 
-    if (!response.ok) {
-      return res.status(500).json({
-        message: "/meta/whoami hit failed",
-        data,
-      });
+    if (!whoamiRes.ok) {
+      console.error("whoami error:", whoamiData);
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch Airtable user info" });
     }
 
-    const airtableUserId = data.id;
-    const email = data.email;
+    const airtableUserId = whoamiData.id;
+    const email = whoamiData.email;
     const name =
-      data.name || data.fullName || data.user?.name || undefined;
+      whoamiData.name ||
+      whoamiData.fullName ||
+      whoamiData.user?.name ||
+      undefined;
 
     if (!airtableUserId || !email) {
       return res
         .status(500)
-        .json({ message: "Unexpected whoami response", data });
+        .json({ message: "Invalid whoami response", whoamiData });
     }
 
+    // 5. Upsert Mongo user
     const user = await User.findOneAndUpdate(
       { airtableUserId },
       {
         email,
         name,
-        accessToken: airtableAccessToken,
-        refreshToken: airtableRefreshToken,
-        accessTokenExpiry: new Date(Date.now() + 10 * 60 * 1000),
-        refreshTokenExpiry: new Date(
-          Date.now() + 7 * 24 * 60 * 60 * 1000
-        ),
+        accessToken, // latest token we just used
       },
       { new: true, upsert: true }
     );
 
-    return res.json({
-      userId: user._id,
-      airtableUserId: user.airtableUserId,
-      email: user.email,
-      name: user.name,
-    });
-  } catch (error) {
-    console.error("get current user error:", error);
-    return res.status(500).json({
-      message: "Failed to load current user",
-      error: error.message,
-    });
+    req.user = user;
+    return next();
+  } catch (err) {
+    console.error("requireAirtableUser error:", err);
+    return res
+      .status(500)
+      .json({ message: "Auth middleware failed", error: err.message });
   }
 };
