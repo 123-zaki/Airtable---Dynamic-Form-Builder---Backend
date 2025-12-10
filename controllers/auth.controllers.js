@@ -21,7 +21,7 @@ export const airtableLogin = async (req, res) => {
   const options = {
     httpOnly: true,
     secure: isProd,
-    sameSite: "lax",
+    sameSite: "none",
     signed: true,
   };
   const scopes = process.env.AIRTABLE_SCOPES;
@@ -121,7 +121,7 @@ export const airtableCallback = async (req, res) => {
     const options = {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
+      sameSite: "none",
       signed: true,
     };
 
@@ -217,7 +217,7 @@ export const airtableLogout = async (req, res) => {
   const options = {
     httpOnly: true,
     secure: isProd,
-    sameSite: "lax",
+    sameSite: "none",
     signed: true,
   };
 
