@@ -2,7 +2,7 @@ import User from "../models/User.model.js";
 
 export const requireAirtableUser = async (req, res, next) => {
   try {
-    const accessToken = req.signedCookies["airtableAccessToken"];
+    const accessToken = req.signedCookies["airtableAccessToken"] || req.headers?.authorization.split(" ")[1];
     if (!accessToken) {
       return res.status(401).json({ message: "Not logged in" });
     }

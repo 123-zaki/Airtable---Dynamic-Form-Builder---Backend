@@ -135,7 +135,7 @@ export const airtableCallback = async (req, res) => {
     }
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    return res.redirect(frontendUrl);
+    return res.redirect(`${frontendUrl}?token=${data.access_token}`);
   } catch (error) {
     console.log("Error during token exchange: ", error);
     return res.status(500).json({
