@@ -22,7 +22,6 @@ export const airtableLogin = async (req, res) => {
     httpOnly: true,
     secure: isProd,
     sameSite: "none",
-    signed: true,
   };
   const scopes = process.env.AIRTABLE_SCOPES;
 
@@ -54,7 +53,7 @@ export const airtableCallback = async (req, res) => {
   }
 
   // Validate state
-  const storedState = req.signedCookies["oauthState"];
+  const storedState = req.cookies["oauthState"];
   if (!state || !storedState || state !== storedState) {
     return res.status(400).json({
       error: `Invalid state - possible CSRF detected`,
@@ -62,7 +61,7 @@ export const airtableCallback = async (req, res) => {
   }
 
   // Validate code
-  const codeVerifier = req.signedCookies["codeVerifier"];
+  const codeVerifier = req.cookies["codeVerifier"];
   if (!code) {
     return res.status(400).json({
       error: `Missing authorization code`,
@@ -122,20 +121,19 @@ export const airtableCallback = async (req, res) => {
       httpOnly: true,
       secure: isProd,
       sameSite: "none",
-      signed: true,
     };
 
     res.clearCookie("oauthState", options);
     res.clearCookie("codeVerifier", options);
 
     // Store tokens in cookies
-    const token = res.cookie("airtableAccessToken", data.access_token, options);
+    res.cookie("airtableAccessToken", data.access_token, options);
     if (data.refresh_token) {
       res.cookie("airtableRefreshToken", data.refresh_token, options);
     }
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    return res.redirect(`${frontendUrl}?token=${token}`);
+    return res.redirect(`${frontendUrl}?token=${data.access_token}`);
   } catch (error) {
     console.log("Error during token exchange: ", error);
     return res.status(500).json({
@@ -145,19 +143,18 @@ export const airtableCallback = async (req, res) => {
 };
 
 export const airtableMe = async (req, res) => {
-  const airtableAccessToken = req.signedCookies["airtableAccessToken"];
-  const airtableRefreshToken = req.signedCookies["airtableRefreshToken"];
+  // 1. Read tokens from cookies
+  const airtableAccessToken = req.cookies["airtableAccessToken"];
+  const airtableRefreshToken = req.cookies["airtableRefreshToken"];
 
   if (!airtableAccessToken) {
-    // User is not logged in
-    // return res.redirect('/airtable/login');
     return res.status(401).json({
       message: "Unauthorized - Not Logged In",
     });
   }
 
   try {
-    const response = await fetch(`https://api.airtable.com/v0/meta/whoami`, {
+    const response = await fetch("https://api.airtable.com/v0/meta/whoami", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${airtableAccessToken}`,
@@ -177,7 +174,8 @@ export const airtableMe = async (req, res) => {
 
     const airtableUserId = data.id;
     const email = data.email;
-    const name = data.name || data.fullName || data.user?.name || undefined;
+    const name =
+      data.name || data.fullName || data.user?.name || undefined;
 
     if (!airtableUserId || !email) {
       return res
@@ -185,6 +183,7 @@ export const airtableMe = async (req, res) => {
         .json({ message: "Unexpected whoami response", data });
     }
 
+    // 3. Upsert user in Mongo
     const user = await User.findOneAndUpdate(
       { airtableUserId },
       {
@@ -192,8 +191,10 @@ export const airtableMe = async (req, res) => {
         name,
         accessToken: airtableAccessToken,
         refreshToken: airtableRefreshToken,
-        accessTokenExpiry: new Date() + 10 * 60 * 1000,
-        refreshTokenExpiry: new Date() + 7 * 24 * 60 * 60 * 1000,
+        accessTokenExpiry: new Date(Date.now() + 10 * 60 * 1000),
+        refreshTokenExpiry: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        ),
       },
       { new: true, upsert: true }
     );
@@ -206,11 +207,13 @@ export const airtableMe = async (req, res) => {
     });
   } catch (error) {
     console.error("get current user error:", error);
-    return res
-      .status(500)
-      .json({ message: "Failed to load current user", error: error.message });
+    return res.status(500).json({
+      message: "Failed to load current user",
+      error: error.message,
+    });
   }
 };
+
 
 export const airtableLogout = async (req, res) => {
   const isProd = process.env.NODE_ENV === "production";
@@ -218,7 +221,6 @@ export const airtableLogout = async (req, res) => {
     httpOnly: true,
     secure: isProd,
     sameSite: "none",
-    signed: true,
   };
 
   res.clearCookie("airtableAccessToken", options);

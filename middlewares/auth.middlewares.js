@@ -1,62 +1,69 @@
-import User from "../models/User.model.js";
+export const airtableMe = async (req, res) => {
+  const airtableAccessToken = req.cookies["airtableAccessToken"];
+  const airtableRefreshToken = req.cookies["airtableRefreshToken"];
 
-export const requireAirtableUser = async (req, res, next) => {
+  if (!airtableAccessToken) {
+    return res.status(401).json({
+      message: "Unauthorized - Not Logged In",
+    });
+  }
+
   try {
-    const accessToken = req.signedCookies["airtableAccessToken"] || req.headers?.authorization.split(" ")[1];
-    if (!accessToken) {
-      return res.status(401).json({ message: "Not logged in" });
-    }
-
-    // Call Airtable whoami
-    const whoamiRes = await fetch("https://api.airtable.com/v0/meta/whoami", {
+    const response = await fetch("https://api.airtable.com/v0/meta/whoami", {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${airtableAccessToken}`,
         Accept: "application/json",
       },
     });
 
-    const whoamiData = await whoamiRes.json();
+    const data = await response.json();
+    console.log("Data (Who-Am-I): ", data);
 
-    if (!whoamiRes.ok) {
-      console.error("whoami error:", whoamiData);
-      return res
-        .status(500)
-        .json({ message: "Failed to fetch Airtable user info" });
+    if (!response.ok) {
+      return res.status(500).json({
+        message: "/meta/whoami hit failed",
+        data,
+      });
     }
 
-    const airtableUserId = whoamiData.id;
-    const email = whoamiData.email;
+    const airtableUserId = data.id;
+    const email = data.email;
     const name =
-      whoamiData.name ||
-      whoamiData.fullName ||
-      whoamiData.user?.name ||
-      undefined;
+      data.name || data.fullName || data.user?.name || undefined;
 
     if (!airtableUserId || !email) {
       return res
         .status(500)
-        .json({ message: "Invalid whoami response", whoamiData });
+        .json({ message: "Unexpected whoami response", data });
     }
 
-    // Upsert Mongo user
     const user = await User.findOneAndUpdate(
       { airtableUserId },
       {
         email,
         name,
-        accessToken, // latest token
+        accessToken: airtableAccessToken,
+        refreshToken: airtableRefreshToken,
+        accessTokenExpiry: new Date(Date.now() + 10 * 60 * 1000),
+        refreshTokenExpiry: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        ),
       },
       { new: true, upsert: true }
     );
 
-    req.user = user;
-
-    return next();
-  } catch (err) {
-    console.error("requireAirtableUser error:", err);
-    return res
-      .status(500)
-      .json({ message: "Auth middleware failed", error: err.message });
+    return res.json({
+      userId: user._id,
+      airtableUserId: user.airtableUserId,
+      email: user.email,
+      name: user.name,
+    });
+  } catch (error) {
+    console.error("get current user error:", error);
+    return res.status(500).json({
+      message: "Failed to load current user",
+      error: error.message,
+    });
   }
 };

@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import session from "express-session";
 
 const app = express();
 
@@ -15,7 +14,7 @@ app.use(cors({
 //     limit: '16kb'
 // }));
 app.use(express.json());
-app.use(cookieParser(process.env.COOKIE_SECRET));
+app.use(cookieParser());
 // app.use(session({
 //     secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
 //     resave: false,
