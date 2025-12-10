@@ -144,7 +144,7 @@ export const airtableCallback = async (req, res) => {
 
 export const airtableMe = async (req, res) => {
   // 1. Read tokens from cookies
-  const airtableAccessToken = req.cookies["airtableAccessToken"];
+  const airtableAccessToken = req.cookies["airtableAccessToken"] || req.headers?.authorization.split(" ")[1];
   const airtableRefreshToken = req.cookies["airtableRefreshToken"];
 
   if (!airtableAccessToken) {
