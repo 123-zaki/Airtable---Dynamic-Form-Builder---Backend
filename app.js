@@ -16,11 +16,11 @@ app.use(cors({
 // }));
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
-    resave: false,
-    saveUninitialized: true,
-}));
+// app.use(session({
+//     secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+//     resave: false,
+//     saveUninitialized: true,
+// }));
 
 // Routes Imports
 import authRouter from "./routes/auth.routes.js";
