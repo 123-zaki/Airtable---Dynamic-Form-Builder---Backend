@@ -3,7 +3,7 @@ import Response from "../models/Response.model.js"; // adjust name/path if neede
 import { shouldShowQuestion } from "../utils/conditional.js";
 
 export const submitResponses = async (req, res) => {
-  const airtableAccessToken = req.signedCookies["airtableAccessToken"];
+  const airtableAccessToken = req.signedCookies["airtableAccessToken"] || req.headers?.authorization.split(" ")[1];
   if (!airtableAccessToken) {
     return res.status(401).json({
       message: `Unauthorized - Not Logged In`,
