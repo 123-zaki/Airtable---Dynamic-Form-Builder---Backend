@@ -129,13 +129,13 @@ export const airtableCallback = async (req, res) => {
     res.clearCookie("codeVerifier", options);
 
     // Store tokens in cookies
-    res.cookie("airtableAccessToken", data.access_token, options);
+    const token = res.cookie("airtableAccessToken", data.access_token, options);
     if (data.refresh_token) {
       res.cookie("airtableRefreshToken", data.refresh_token, options);
     }
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    return res.redirect(`${frontendUrl}?token=${data.access_token}`);
+    return res.redirect(`${frontendUrl}?token=${token}`);
   } catch (error) {
     console.log("Error during token exchange: ", error);
     return res.status(500).json({
